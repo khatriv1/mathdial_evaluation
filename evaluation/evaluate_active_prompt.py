@@ -26,13 +26,11 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
     # Load and preprocess test data
     try:
         loader = MathDialDataLoader(data_path)
-        df, teacher_moves = loader.load_data()
+        df, teacher_moves = loader.load_data(sample_size=limit)
         
         if df.empty:
             raise Exception("No valid conversations found in the data file")
         
-        if limit:
-            df = df.head(limit)
         print(f"\nTotal samples for evaluation: {len(df)}")
         
     except Exception as e:
@@ -63,9 +61,14 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
         # Fallback if pool file doesn't exist
         print(f"WARNING: Pool file not found at {pool_path}")
         print("Falling back to using first 20 samples from test set")
-        pool_df = df.head(20)
-        df = df.iloc[20:]  # Skip pool samples in evaluation if using fallback
-        print("Note: Evaluation will skip first 20 samples to avoid bias")
+        pool_loader = MathDialDataLoader(data_path)
+        pool_df, _ = pool_loader.load_data(sample_size=20)
+        # If using fallback, need to skip those samples in evaluation
+        if limit is None or limit > 20:
+            # Reload data skipping first 20
+            df_full, _ = loader.load_data()
+            df = df_full.iloc[20:limit] if limit else df_full.iloc[20:]
+            print(f"Note: Evaluation will skip first 20 samples to avoid bias")
     
     # Get 8 examples (1 uncertain + 1 wrong per category) from the pool
     uncertainty_data = prepare_active_prompting_data(pool_df, client)
@@ -91,17 +94,15 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
     all_predictions = []
     detailed_results = []
     
-    # IMPORTANT: If using separate pool, evaluate on FULL test set
-    eval_df = df
-    
-    total = len(eval_df)
+    # Process each conversation
+    total = len(df)
     print(f"\nEvaluating on {total} test conversations")
     if os.path.exists(pool_path):
         print("(Testing on FULL dataset - pool is separate, no bias!)")
     else:
         print("(Testing on remaining samples after excluding pool)")
     
-    for seq, (_, row) in enumerate(eval_df.iterrows(), start=1):
+    for seq, (_, row) in enumerate(df.iterrows(), start=1):
         print(f"\n{'='*60}")
         print(f"Processing conversation {seq}/{total}")
         print(f"Conversation ID: {row['conversation_id']}")
@@ -117,19 +118,11 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
             # Get full context
             conversation = row['cleaned_conversation']
             question = row['question']
-            student_solution = row['student_incorrect_solution']
+            student_solution = row.get('student_incorrect_solution', '')
             student_profile = row.get('student_profile', '')
             
-            # Display the conversation for verification
-            print("\n--- Conversation ---")
-            lines = conversation.split('\n')
-            for i, line in enumerate(lines[:10]):  # Show first 10 lines
-                print(f"  {line}")
-            if len(lines) > 10:
-                print(f"  ... ({len(lines)-10} more lines)")
-            print("--- End Conversation ---\n")
-            
             # Parse conversation and classify each teacher utterance
+            lines = conversation.split('\n')
             context = ""
             predicted_moves = []
             teacher_utterances = []
@@ -139,9 +132,11 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
                     utterance = line.replace('Teacher:', '').strip()
                     
                     if utterance:
-                        # Get Active Prompting prediction WITH FULL CONTEXT
+                        # Get prediction with context up to this point
                         prediction = get_active_prompt_prediction(
-                            utterance, context, client,
+                            utterance, 
+                            context,
+                            client,
                             question=question,
                             student_solution=student_solution,
                             student_profile=student_profile,
@@ -150,6 +145,7 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
                         predicted_moves.append(prediction)
                         teacher_utterances.append(utterance)
                     
+                    # Add to context for next utterance
                     context += f"Teacher: {utterance}\n"
                     
                 elif line.startswith('Student:'):
@@ -158,29 +154,10 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
             
             all_predictions.append(predicted_moves)
             
-            # Display utterance-by-utterance comparison
-            print("\nUtterance-by-utterance analysis:")
-            for i in range(min(5, len(teacher_utterances))):  # Show first 5
-                ground_truth = ground_truth_moves[i] if i < len(ground_truth_moves) else "N/A"
-                prediction = predicted_moves[i] if i < len(predicted_moves) else "N/A"
-                match = "✓" if ground_truth == prediction else "✗"
-                print(f"  {i+1}. Teacher: \"{teacher_utterances[i][:50]}...\"")
-                print(f"     Ground truth: {ground_truth}, Predicted: {prediction} {match}")
-            
-            if len(teacher_utterances) > 5:
-                print(f"  ... ({len(teacher_utterances)-5} more utterances)")
-            
-            # Calculate metrics for this conversation
-            exact_match = (len(ground_truth_moves) == len(predicted_moves) and 
-                          all(g == p for g, p in zip(ground_truth_moves, predicted_moves)))
-            
-            min_len = min(len(ground_truth_moves), len(predicted_moves))
-            if min_len > 0:
-                move_matches = sum(1 for i in range(min_len) 
-                                 if ground_truth_moves[i] == predicted_moves[i])
-                move_accuracy = move_matches / len(ground_truth_moves)
-            else:
-                move_accuracy = 0.0
+            # Calculate position-by-position accuracy for this conversation
+            conversation_correct = sum(1 for i in range(min(len(ground_truth_moves), len(predicted_moves)))
+                                     if ground_truth_moves[i] == predicted_moves[i])
+            move_accuracy = (conversation_correct / len(ground_truth_moves)) * 100 if ground_truth_moves else 0
             
             # Store detailed result
             detailed_results.append({
@@ -189,34 +166,30 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
                 'num_teacher_moves': len(ground_truth_moves),
                 'ground_truth_moves': ground_truth_moves,
                 'predicted_moves': predicted_moves,
-                'exact_match': exact_match,
-                'move_accuracy': move_accuracy,
-                'conversation_snippet': conversation[:200] + "..."
+                'position_accuracy': move_accuracy,
+                'correct_positions': conversation_correct,
+                'num_uncertainty_examples': len(uncertainty_data)
             })
             
-            print(f"\nSummary:")
-            print(f"  Ground truth moves: {ground_truth_moves}")
-            print(f"  Predicted moves: {predicted_moves}")
-            print(f"  Exact match: {exact_match}")
-            print(f"  Move accuracy: {move_accuracy:.3f}")
+            print(f"  Ground truth: {ground_truth_moves}")
+            print(f"  Predictions:  {predicted_moves}")
+            print(f"  Position accuracy: {move_accuracy:.1f}% ({conversation_correct}/{len(ground_truth_moves)})")
             
         except Exception as e:
             print(f"Error processing conversation {conversation_id}: {str(e)}")
+            all_predictions.append([])
             continue
         
         time.sleep(1)  # Rate limiting
     
-    if not all_ground_truth:
-        raise Exception("No valid predictions were generated")
-    
-    # Calculate metrics
+    # Calculate metrics using position-by-position accuracy
     metrics = metrics_calc.comprehensive_evaluation(all_ground_truth, all_predictions)
     
     # Print results
     print("\n" + "="*60)
     metrics_calc.print_results(metrics, "Active Prompting (8 Examples, Separate Pool)")
     
-    # Save detailed results
+    # Save results
     results_df = pd.DataFrame(detailed_results)
     results_df.to_csv(f"{output_dir}/detailed_results.csv", index=False)
     print(f"\nDetailed results saved to {output_dir}/detailed_results.csv")
@@ -227,17 +200,19 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
         uncertainty_df.to_csv(f"{output_dir}/uncertainty_examples.csv", index=False)
         print(f"Uncertainty examples saved to {output_dir}/uncertainty_examples.csv")
     
-    # Save metrics summary with pool info
+    # Save metrics summary
     metrics_summary = {
         'technique': 'Active Prompting (8 Examples)',
-        'accuracy': metrics['accuracy'],
+        'position_accuracy': metrics['accuracy'],
+        'total_correct': metrics['total_correct'],
+        'total_positions': metrics['total_positions'],
+        'mean_conversation_accuracy': metrics['mean_conversation_accuracy'],
+        'exact_match_accuracy': metrics['exact_match_accuracy'],
         'cohens_kappa': metrics['cohens_kappa'],
         'krippendorffs_alpha': metrics['krippendorffs_alpha'],
         'icc': metrics['icc'],
         'num_samples': metrics['num_samples'],
-        'num_uncertainty_examples': len(uncertainty_data),
-        'test_samples': total,
-        'self_consistency': False
+        'num_uncertainty_examples': len(uncertainty_data)
     }
     
     summary_df = pd.DataFrame([metrics_summary])
@@ -247,18 +222,17 @@ def evaluate_active_prompt(data_path: str, api_key: str, output_dir: str = "resu
     print("EVALUATION COMPLETE")
     print("="*60)
     print(f"Total examples prepared: {len(uncertainty_data)}")
-    print(f"Accuracy: {metrics['accuracy']:.1f}%")
+    print(f"Position Accuracy: {metrics['accuracy']:.1f}%")
     
     return detailed_results, metrics
 
 if __name__ == "__main__":
-    # Import config
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     import config
     
-    # Run evaluation
     try:
-        print(f"\nStarting Active Prompting evaluation (Separate Pool, No Bias)...")
+        print("\nStarting Active Prompting evaluation (Separate Pool, No Bias)...")
+        print("Using POSITION-BY-POSITION accuracy metrics")
         print(f"Using test data: {config.DATA_PATH}")
         print(f"Using pool data: data/active_prompting_pool_20.csv")
         
@@ -267,7 +241,7 @@ if __name__ == "__main__":
             api_key=config.OPENAI_API_KEY,
             limit=None  # Set to None for full evaluation or a number for testing
         )
-        print("\nEvaluation completed successfully!")
+        print(f"\nFinal Position Accuracy: {metrics['accuracy']:.1f}%")
         
     except Exception as e:
         print(f"\n✗ Active Prompting failed: {str(e)}")

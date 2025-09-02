@@ -2,8 +2,7 @@
 
 """
 Self-Consistency prompting for MathDial teacher move classification.
-Samples multiple reasoning paths and takes majority vote.
-NOW INCLUDES: Few-shot examples + Auto-CoT
+FIXED: Properly handles context for each utterance with multiple reasoning paths
 """
 import sys
 import os
@@ -13,7 +12,7 @@ import time
 import json
 import re
 import numpy as np
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from collections import Counter
 from utils.mathdial_rubric import MathDialRubric
 
@@ -23,22 +22,24 @@ def get_single_reasoning_path(teacher_utterance: str,
                             question: str = None,
                             student_solution: str = None,
                             student_profile: str = None,
-                            temperature: float = 0.7) -> Optional[str]:
+                            temperature: float = 0.7,
+                            path_num: int = None) -> Optional[str]:
     """
-    Get a single reasoning path for classification.
+    Get a single reasoning path for classifying ONE SPECIFIC utterance.
     NOW WITH: Few-shot examples + Auto-CoT
     
     Args:
-        teacher_utterance: Teacher's utterance
-        conversation_context: Context
+        teacher_utterance: The SPECIFIC teacher's utterance to classify
+        conversation_context: ALL previous conversation up to this utterance
         client: OpenAI client
         question: The math problem being discussed
         student_solution: The student's incorrect solution
         student_profile: The student's profile/characteristics
         temperature: Sampling temperature for diversity
+        path_num: Which reasoning path this is (for debugging)
     
     Returns:
-        Classification or None if failed
+        Classification for THIS SPECIFIC utterance or None if failed
     """
     categories = ['generic', 'focus', 'probing', 'telling']
     
@@ -76,7 +77,7 @@ Classification: telling
 
 """
 
-    # ADD THE MISSING CONTEXT
+    # BUILD FULL CONTEXT - This is critical!
     context_info = ""
     if question:
         context_info += f"Math Problem: {question}\n\n"
@@ -92,21 +93,23 @@ TEACHER MOVE CATEGORIES:
 
 {examples_text}
 
+TASK: Classify ONE SPECIFIC teacher utterance using the examples and reasoning.
+You have the full conversation context, but you must classify ONLY the specified utterance.
+
 {context_info}
 
-Now work on this one:
-
-Conversation Context:
+CONVERSATION CONTEXT (everything that happened before this utterance):
 {conversation_context}
 
+CURRENT TEACHER UTTERANCE TO CLASSIFY (classify ONLY this):
 Teacher: "{teacher_utterance}"
 
 Let's think step by step.
 
 Think through this step-by-step and provide your classification:
-1. What is the main purpose of this teacher utterance?
-2. What pedagogical intent does it serve?
-3. Which category best fits?
+1. What is the main purpose of THIS SPECIFIC teacher utterance?
+2. What pedagogical intent does THIS utterance serve?
+3. Which category best fits THIS utterance?
 
 Provide your classification: generic, focus, probing, or telling
 
@@ -116,7 +119,7 @@ Classification:"""
         response = client.chat.completions.create(
             model=config.MODEL_ID,
             messages=[
-                {"role": "system", "content": "You are an expert at classifying teacher moves. Learn from examples, think step by step, and provide the category."},
+                {"role": "system", "content": "You are an expert at classifying individual teacher utterances. Learn from examples, think step by step about ONLY the specified utterance, and provide the category."},
                 {"role": "user", "content": prompt}
             ],
             temperature=temperature,
@@ -130,7 +133,8 @@ Classification:"""
         return classification
             
     except Exception as e:
-        print(f"Error in reasoning path: {str(e)}")
+        if path_num:
+            print(f"    Error in reasoning path {path_num}: {str(e)}")
         return None
 
 def get_self_consistency_prediction(teacher_utterance: str,
@@ -139,35 +143,46 @@ def get_self_consistency_prediction(teacher_utterance: str,
                                    question: str = None,
                                    student_solution: str = None,
                                    student_profile: str = None,
-                                   n_samples: int = 5) -> str:
+                                   n_samples: int = 5,
+                                   utterance_num: int = None) -> str:
     """
-    Get Self-Consistency prediction using multiple reasoning paths.
-    NOW WITH: Few-shot examples + Auto-CoT in each attempt
+    Get Self-Consistency prediction for ONE SPECIFIC utterance using multiple reasoning paths.
+    
+    IMPORTANT: This generates multiple classifications for the SAME utterance
+    and takes a majority vote for robustness.
     
     Args:
-        teacher_utterance: Teacher's utterance
-        conversation_context: Context
+        teacher_utterance: The SPECIFIC teacher's utterance to classify
+        conversation_context: ALL previous conversation up to this utterance
         client: OpenAI client
         question: The math problem being discussed
         student_solution: The student's incorrect solution
         student_profile: The student's profile/characteristics
         n_samples: Number of reasoning paths to sample
+        utterance_num: Which teacher utterance this is (for debugging)
     
     Returns:
-        Classification based on majority vote
+        Classification for THIS SPECIFIC utterance based on majority vote
     """
     categories = ['generic', 'focus', 'probing', 'telling']
+    
+    # Debug output for verification
+    if utterance_num is not None and utterance_num <= 2:  # Show for first 2 utterances
+        print(f"\n  [DEBUG Self-Consistency] Classifying Teacher Utterance #{utterance_num}:")
+        print(f"    Utterance: \"{teacher_utterance[:60]}...\"")
+        print(f"    Sampling {n_samples} reasoning paths for this utterance")
     
     # Collect predictions from multiple reasoning paths
     all_predictions = []
     
     for i in range(n_samples):
-        # Fixed temperature for all samples (same as Bloom)
+        # Fixed temperature for all samples (same as original)
         temp = 0.7
         
         prediction = get_single_reasoning_path(
             teacher_utterance, conversation_context, client,
-            question, student_solution, student_profile, temp
+            question, student_solution, student_profile, temp,
+            path_num=i+1
         )
         
         if prediction is not None:
@@ -177,18 +192,17 @@ def get_self_consistency_prediction(teacher_utterance: str,
         time.sleep(0.2)
     
     if not all_predictions:
-        print(f"No valid predictions obtained for self-consistency")
+        if utterance_num:
+            print(f"    No valid predictions for utterance {utterance_num}")
         return 'generic'
     
     # Take majority vote
     vote_counts = Counter(all_predictions)
     majority_vote = vote_counts.most_common(1)[0][0]
     
-    # Print voting details if there was disagreement
-    if len(set(all_predictions)) > 1:
-        print(f"  Votes: {dict(vote_counts)} → majority={majority_vote}")
-    
-    print(f"Self-consistency: Used {len(all_predictions)} predictions")
+    # Print voting details if there was disagreement (only for first few utterances)
+    if utterance_num and utterance_num <= 2 and len(set(all_predictions)) > 1:
+        print(f"    Votes: {dict(vote_counts)} → majority={majority_vote}")
     
     return majority_vote
 
@@ -208,4 +222,4 @@ def get_self_consistency_classification(teacher_utterance: str, client,
                                        conversation_context: str = "", 
                                        n_samples: int = 5) -> str:
     """Alias for backward compatibility."""
-    return get_self_consistency_prediction(teacher_utterance, conversation_context, client, n_samples)
+    return get_self_consistency_prediction(teacher_utterance, conversation_context, client, n_samples=n_samples)

@@ -21,6 +21,13 @@ venv/
 ENV/
 debug_check.py
 test_single.py
+MathDial_Debug_Analyzer.py
+analyze_csv_structure.py
+complete_test.py
+test_conversation_parsing.py
+output_baseline_GPT3.5_Final.txt
+output_baseline_GPT3.5.txt
+debug_llm_inspection.py
 
 # IDE
 .idea/
