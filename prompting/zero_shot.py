@@ -10,9 +10,8 @@ import config
 import time
 import json
 import re
-from typing import Optional, Dict
-from utils.mathdial_rubric import MathDialRubric
 from typing import Optional, Dict, List, Tuple
+from utils.mathdial_rubric import MathDialRubric
 
 def parse_classification(response_text: str, categories: list) -> str:
     """
@@ -35,7 +34,9 @@ def parse_classification(response_text: str, categories: list) -> str:
     # Default fallback
     return 'generic'
 
-def get_zero_shot_prediction(teacher_utterance: str, conversation_context: str, client) -> str:
+def get_zero_shot_prediction(teacher_utterance: str, conversation_context: str, client,
+                            question: str = None, student_solution: str = None,
+                            student_profile: str = None) -> str:
     """
     Get zero-shot prediction for teacher move classification.
     
@@ -43,6 +44,9 @@ def get_zero_shot_prediction(teacher_utterance: str, conversation_context: str, 
         teacher_utterance: The teacher's utterance to classify
         conversation_context: Previous conversation context
         client: OpenAI client
+        question: The math problem being discussed
+        student_solution: The student's incorrect solution
+        student_profile: The student's profile/characteristics
     
     Returns:
         One of: 'generic', 'focus', 'probing', 'telling'
@@ -63,6 +67,15 @@ def get_zero_shot_prediction(teacher_utterance: str, conversation_context: str, 
             for intent, example in intents.items():
                 definitions_text += f"  - {intent}: {example}\n"
     
+    # ADD THE MISSING CONTEXT
+    context_info = ""
+    if question:
+        context_info += f"Math Problem: {question}\n\n"
+    if student_solution:
+        context_info += f"Student's Incorrect Solution: {student_solution}\n\n"
+    if student_profile:
+        context_info += f"Student Profile: {student_profile}\n\n"
+    
     prompt = f"""Your expertise lies in categorizing teacher moves in math tutoring based on pedagogical intent.
 
 TEACHER MOVE CATEGORIES:
@@ -70,6 +83,7 @@ TEACHER MOVE CATEGORIES:
 
 TASK: Analyze the following teacher utterance and classify it into one of the four categories above.
 
+{context_info}
 
 Now work on this one:
 
@@ -109,63 +123,10 @@ Classification:"""
         # Return default
         return 'generic'
 
-def get_zero_shot_prediction_multi_turn(conversation: str, client) -> list:
-    """
-    Get zero-shot prediction for multiple teacher utterances in a conversation.
-    
-    Args:
-        conversation: Full conversation text
-        client: OpenAI client
-    
-    Returns:
-        List of classifications for each teacher utterance
-    """
-    classifications = []
-    
-    # Parse conversation
-    lines = conversation.split('\n')
-    context = ""
-    
-    for line in lines:
-        if line.startswith('Teacher:'):
-            # Extract utterance
-            utterance = line.replace('Teacher:', '').strip()
-            # Remove ground truth labels if present
-            utterance = re.sub(r'\([^)]+\)', '', utterance)
-            utterance = utterance.replace('|EOM|', '').strip()
-            
-            if utterance:
-                # Get classification
-                classification = get_zero_shot_prediction(utterance, context, client)
-                classifications.append(classification)
-            
-            # Update context
-            context += f"Teacher: {utterance}\n"
-            
-        elif line.startswith('Student:'):
-            student_utterance = line.replace('Student:', '').strip()
-            student_utterance = student_utterance.replace('|EOM|', '').strip()
-            context += f"Student: {student_utterance}\n"
-    
-    return classifications
-
-# Legacy function for backwards compatibility
-def get_zero_shot_classification(teacher_utterance: str, client, conversation_context: str = "") -> str:
-    """
-    Legacy function for single utterance classification.
-    """
-    return get_zero_shot_prediction(teacher_utterance, conversation_context, client)
-
-def analyze_conversation_moves(conversation: str, client) -> List[Tuple[str, str]]:
+def analyze_conversation_moves(conversation: str, client, question: str = None,
+                              student_solution: str = None, student_profile: str = None) -> List[Tuple[str, str]]:
     """
     Analyze all teacher moves in a complete conversation.
-    
-    Args:
-        conversation: Full conversation text with Teacher: and Student: labels
-        client: OpenAI client
-        
-    Returns:
-        List of (utterance, classification) tuples
     """
     results = []
     
@@ -183,8 +144,13 @@ def analyze_conversation_moves(conversation: str, client) -> List[Tuple[str, str
             utterance = utterance.replace('|EOM|', '').strip()
             
             if utterance:
-                # Classify this utterance
-                classification = get_zero_shot_prediction(utterance, context, client)
+                # Classify this utterance WITH FULL CONTEXT
+                classification = get_zero_shot_prediction(
+                    utterance, context, client,
+                    question=question,
+                    student_solution=student_solution,
+                    student_profile=student_profile
+                )
                 results.append((utterance, classification))
             
             # Add to context
@@ -197,3 +163,10 @@ def analyze_conversation_moves(conversation: str, client) -> List[Tuple[str, str
             context += f"Student: {student_utterance}\n"
     
     return results
+
+# Legacy function for backwards compatibility
+def get_zero_shot_classification(teacher_utterance: str, client, conversation_context: str = "") -> str:
+    """
+    Legacy function for single utterance classification.
+    """
+    return get_zero_shot_prediction(teacher_utterance, conversation_context, client)

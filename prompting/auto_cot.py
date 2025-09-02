@@ -14,7 +14,9 @@ import re
 from typing import List, Optional, Dict
 from utils.mathdial_rubric import MathDialRubric
 
-def get_auto_cot_prediction(teacher_utterance: str, conversation_context: str, client) -> str:
+def get_auto_cot_prediction(teacher_utterance: str, conversation_context: str, client,
+                           question: str = None, student_solution: str = None,
+                           student_profile: str = None) -> str:
     """
     Auto-CoT: Just Zero-Shot + "Let's think step by step"
     
@@ -22,6 +24,9 @@ def get_auto_cot_prediction(teacher_utterance: str, conversation_context: str, c
         teacher_utterance: The teacher's utterance to classify
         conversation_context: Previous conversation context
         client: OpenAI client
+        question: The math problem being discussed
+        student_solution: The student's incorrect solution
+        student_profile: The student's profile/characteristics
     
     Returns:
         One of: 'generic', 'focus', 'probing', 'telling'
@@ -34,6 +39,15 @@ def get_auto_cot_prediction(teacher_utterance: str, conversation_context: str, c
     for cat in categories:
         definitions_text += f"{cat.upper()}: {rubric.get_move_definition(cat)}\n"
 
+    # ADD THE MISSING CONTEXT
+    context_info = ""
+    if question:
+        context_info += f"Math Problem: {question}\n\n"
+    if student_solution:
+        context_info += f"Student's Incorrect Solution: {student_solution}\n\n"
+    if student_profile:
+        context_info += f"Student Profile: {student_profile}\n\n"
+
     # EXACTLY like Zero-Shot but with "Let's think step by step" added
     prompt = f"""You are an expert educator classifying teacher moves in math tutoring conversations.
 
@@ -41,6 +55,8 @@ TEACHER MOVE CATEGORIES:
 {definitions_text}
 
 TASK: Analyze the following teacher utterance and classify it into one of the four categories above.
+
+{context_info}
 
 Now work on this one:
 

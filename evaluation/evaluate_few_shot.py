@@ -49,8 +49,10 @@ def evaluate_few_shot(data_path: str, api_key: str, output_dir: str = "results/f
     # Process each conversation
     total = len(df)
     for seq, (_, row) in enumerate(df.iterrows(), start=1):
-        print(f"\nProcessing conversation {seq}/{total}")
+        print(f"\n{'='*60}")
+        print(f"Processing conversation {seq}/{total}")
         print(f"Conversation ID: {row['conversation_id']}")
+        print(f"Question: {row['question'][:100]}...")
         
         conversation_id = row['conversation_id']
         
@@ -59,20 +61,40 @@ def evaluate_few_shot(data_path: str, api_key: str, output_dir: str = "results/f
             ground_truth_moves = row['ground_truth_moves']
             all_ground_truth.append(ground_truth_moves)
             
-            # Parse conversation and classify each teacher utterance
+            # Get full context
             conversation = row['cleaned_conversation']
+            question = row['question']
+            student_solution = row['student_incorrect_solution']
+            student_profile = row.get('student_profile', '')
+            
+            # Display the conversation for verification
+            print("\n--- Conversation ---")
             lines = conversation.split('\n')
+            for i, line in enumerate(lines[:10]):  # Show first 10 lines
+                print(f"  {line}")
+            if len(lines) > 10:
+                print(f"  ... ({len(lines)-10} more lines)")
+            print("--- End Conversation ---\n")
+            
+            # Parse conversation and classify each teacher utterance
             context = ""
             predicted_moves = []
+            teacher_utterances = []
             
             for line in lines:
                 if line.startswith('Teacher:'):
                     utterance = line.replace('Teacher:', '').strip()
                     
                     if utterance:
-                        # Get few-shot prediction
-                        prediction = get_few_shot_prediction(utterance, context, client)
+                        # Get few-shot prediction WITH FULL CONTEXT
+                        prediction = get_few_shot_prediction(
+                            utterance, context, client,
+                            question=question,
+                            student_solution=student_solution,
+                            student_profile=student_profile
+                        )
                         predicted_moves.append(prediction)
+                        teacher_utterances.append(utterance)
                     
                     context += f"Teacher: {utterance}\n"
                     
@@ -81,6 +103,18 @@ def evaluate_few_shot(data_path: str, api_key: str, output_dir: str = "results/f
                     context += f"Student: {student_utterance}\n"
             
             all_predictions.append(predicted_moves)
+            
+            # Display utterance-by-utterance comparison
+            print("\nUtterance-by-utterance analysis:")
+            for i in range(min(5, len(teacher_utterances))):  # Show first 5
+                ground_truth = ground_truth_moves[i] if i < len(ground_truth_moves) else "N/A"
+                prediction = predicted_moves[i] if i < len(predicted_moves) else "N/A"
+                match = "✓" if ground_truth == prediction else "✗"
+                print(f"  {i+1}. Teacher: \"{teacher_utterances[i][:50]}...\"")
+                print(f"     Ground truth: {ground_truth}, Predicted: {prediction} {match}")
+            
+            if len(teacher_utterances) > 5:
+                print(f"  ... ({len(teacher_utterances)-5} more utterances)")
             
             # Calculate metrics for this conversation
             exact_match = (len(ground_truth_moves) == len(predicted_moves) and 
@@ -102,13 +136,15 @@ def evaluate_few_shot(data_path: str, api_key: str, output_dir: str = "results/f
                 'ground_truth_moves': ground_truth_moves,
                 'predicted_moves': predicted_moves,
                 'exact_match': exact_match,
-                'move_accuracy': move_accuracy
+                'move_accuracy': move_accuracy,
+                'conversation_snippet': conversation[:200] + "..."
             })
             
-            print(f"Ground truth moves: {ground_truth_moves}")
-            print(f"Predicted moves: {predicted_moves}")
-            print(f"Exact match: {exact_match}")
-            print(f"Move accuracy: {move_accuracy:.3f}")
+            print(f"\nSummary:")
+            print(f"  Ground truth moves: {ground_truth_moves}")
+            print(f"  Predicted moves: {predicted_moves}")
+            print(f"  Exact match: {exact_match}")
+            print(f"  Move accuracy: {move_accuracy:.3f}")
             
         except Exception as e:
             print(f"Error processing conversation {conversation_id}: {str(e)}")
@@ -123,6 +159,7 @@ def evaluate_few_shot(data_path: str, api_key: str, output_dir: str = "results/f
     metrics = metrics_calc.comprehensive_evaluation(all_ground_truth, all_predictions)
     
     # Print results
+    print("\n" + "="*60)
     metrics_calc.print_results(metrics, "Few-shot")
     
     # Save detailed results

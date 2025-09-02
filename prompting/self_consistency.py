@@ -20,6 +20,9 @@ from utils.mathdial_rubric import MathDialRubric
 def get_single_reasoning_path(teacher_utterance: str,
                             conversation_context: str,
                             client,
+                            question: str = None,
+                            student_solution: str = None,
+                            student_profile: str = None,
                             temperature: float = 0.7) -> Optional[str]:
     """
     Get a single reasoning path for classification.
@@ -29,6 +32,9 @@ def get_single_reasoning_path(teacher_utterance: str,
         teacher_utterance: Teacher's utterance
         conversation_context: Context
         client: OpenAI client
+        question: The math problem being discussed
+        student_solution: The student's incorrect solution
+        student_profile: The student's profile/characteristics
         temperature: Sampling temperature for diversity
     
     Returns:
@@ -70,12 +76,23 @@ Classification: telling
 
 """
 
+    # ADD THE MISSING CONTEXT
+    context_info = ""
+    if question:
+        context_info += f"Math Problem: {question}\n\n"
+    if student_solution:
+        context_info += f"Student's Incorrect Solution: {student_solution}\n\n"
+    if student_profile:
+        context_info += f"Student Profile: {student_profile}\n\n"
+
     prompt = f"""You are an expert educator classifying teacher moves in math tutoring conversations.
 
 TEACHER MOVE CATEGORIES:
 {definitions_text}
 
 {examples_text}
+
+{context_info}
 
 Now work on this one:
 
@@ -119,6 +136,9 @@ Classification:"""
 def get_self_consistency_prediction(teacher_utterance: str,
                                    conversation_context: str,
                                    client,
+                                   question: str = None,
+                                   student_solution: str = None,
+                                   student_profile: str = None,
                                    n_samples: int = 5) -> str:
     """
     Get Self-Consistency prediction using multiple reasoning paths.
@@ -128,6 +148,9 @@ def get_self_consistency_prediction(teacher_utterance: str,
         teacher_utterance: Teacher's utterance
         conversation_context: Context
         client: OpenAI client
+        question: The math problem being discussed
+        student_solution: The student's incorrect solution
+        student_profile: The student's profile/characteristics
         n_samples: Number of reasoning paths to sample
     
     Returns:
@@ -142,7 +165,10 @@ def get_self_consistency_prediction(teacher_utterance: str,
         # Fixed temperature for all samples (same as Bloom)
         temp = 0.7
         
-        prediction = get_single_reasoning_path(teacher_utterance, conversation_context, client, temp)
+        prediction = get_single_reasoning_path(
+            teacher_utterance, conversation_context, client,
+            question, student_solution, student_profile, temp
+        )
         
         if prediction is not None:
             all_predictions.append(prediction)
