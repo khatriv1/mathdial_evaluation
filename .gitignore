@@ -19,6 +19,8 @@ __pycache__/
 .Python
 venv/
 ENV/
+debug_check.py
+test_single.py
 
 # IDE
 .idea/
