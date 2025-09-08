@@ -159,8 +159,8 @@ Classification:"""
                 {"role": "system", "content": "You are an expert at classifying individual teacher utterances. Learn from challenging examples, think step by step about ONLY the specified utterance."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0,  # Deterministic for final prediction
-            max_tokens=400,
+            #temperature=0,  # Deterministic for final prediction
+            # max_tokens=400,
             timeout=15
         )
         

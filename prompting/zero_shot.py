@@ -110,8 +110,8 @@ Classification:"""
                 {"role": "system", "content": "You are an expert at classifying individual teacher utterances in math tutoring. Classify ONLY the specified utterance, using context for understanding."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0,
-            max_tokens=150
+            #temperature=0,
+            #max_tokens=150
         )
         
         result = response.choices[0].message.content.strip()

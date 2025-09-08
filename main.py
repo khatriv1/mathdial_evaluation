@@ -238,6 +238,7 @@ def run_mathdial_evaluations(data_path, api_key, output_dir="results", limit=Non
 if __name__ == "__main__":
     print("=" * 70)
     print("MathDial Teacher Move Classification: Comprehensive Evaluation Suite")
+    print("Model used :",config.MODEL_ID,)
     print("=" * 70)
     print(f"Using MathDial dataset: {config.DATA_PATH}")
     

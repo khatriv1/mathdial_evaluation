@@ -15,14 +15,14 @@ from pathlib import Path
 class MathDialDataLoader:
     """Data loader for MathDial tutoring dialogue dataset"""
     
-    def __init__(self, data_path: str = "data/hold_out150.csv"):
+    def __init__(self, data_path: str):  # FIXED: No default path
         self.data_path = Path(data_path)
         self.teacher_moves = ['generic', 'focus', 'probing', 'telling']
         self.logger = logging.getLogger(__name__)
         
     def load_data(self, sample_size: Optional[int] = None) -> Tuple[pd.DataFrame, List[str]]:
         """
-        Load and process MathDial data from hold_out150.csv
+        Load and process MathDial data from CSV
         Groups by QID + Student Name to form unique conversations
         Preserves original order from CSV
         
@@ -38,7 +38,7 @@ class MathDialDataLoader:
         # Load the CSV file
         df_raw = pd.read_csv(self.data_path)
         self.logger.info(f"Loaded {len(df_raw)} rows with {len(df_raw.columns)} columns")
-        print(f"Loaded {len(df_raw)} rows from hold_out150.csv")
+        print(f"Loaded {len(df_raw)} rows from {self.data_path.name}")  # FIXED: Use actual filename
         
         # Extract student names from each row
         df_raw['student_name'] = df_raw['student_profile'].apply(self._extract_student_name)
@@ -242,7 +242,7 @@ class MathDialDataLoader:
 
 
 # Compatibility functions for existing evaluation code
-def load_and_preprocess_mathdial_data(data_path: str = "data/hold_out150.csv", 
+def load_and_preprocess_mathdial_data(data_path: str,  # FIXED: No default
                                       sample_size: Optional[int] = None) -> Tuple[pd.DataFrame, List[str]]:
     """Load and preprocess MathDial data (compatibility function)"""
     loader = MathDialDataLoader(data_path)

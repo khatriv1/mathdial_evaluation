@@ -13,7 +13,7 @@ results/
 *.csv
 
 # Python
-__pycache__/
+**pycache**/
 *.py[cod]
 *$py.class
 .Python
@@ -37,3 +37,41 @@ debug_llm_inspection.py
 # OS specific
 .DS_Store
 Thumbs.db
+
+# ===== ADD THESE NEW LINES =====
+
+# Text output files from experiments
+*.txt
+*.log
+*.out
+
+# JSON output files
+*.json
+
+# DSPy cache directories
+.dspy_cache/
+dspy_cache/
+*.dspy
+.dspy*
+.cache/
+
+# LiteLLM cache
+.litellm/
+~/.cache/litellm/
+
+# Experiment outputs
+mathdial_gpt5_output*.txt
+dspy_output*.txt
+*_output.txt
+*_results.txt
+matial_gpt5_output.txt
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+CORRECT
+create_clean_apo.py
+test.py

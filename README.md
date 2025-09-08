@@ -1,6 +1,10 @@
-# MathDial Teacher Move Classification Evaluation
+# MathDial Teacher Move Classification System
 
-A comprehensive evaluation framework for classifying teacher pedagogical moves in math‑tutoring conversations using the **MathDial** dataset. This project compares five advanced LLM prompting strategies to determine which best matches expert annotations.
+A comprehensive evaluation and optimization framework for classifying teacher pedagogical moves in math tutoring conversations using the **MathDial** dataset. This project includes three major components:
+
+1. **Baseline Evaluation Framework** - Traditional prompting techniques
+2. **APO Optimization** - Automatic Prompt Optimization for rubric refinement
+3. **DSPy Implementation** - Data-driven learning approach without predefined rubrics
 
 ---
 
@@ -8,52 +12,31 @@ A comprehensive evaluation framework for classifying teacher pedagogical moves i
 
 * [Project Overview](#project-overview)
 * [Teacher Move Categories](#teacher-move-categories)
-* [Key Features](#key-features)
-* [Project Structure](#project-structure)
+* [System Components](#system-components)
+  * [1. Baseline Evaluation](#1-baseline-evaluation)
+  * [2. APO Optimization](#2-apo-optimization)
+  * [3. DSPy Implementation](#3-dspy-implementation)
 * [Installation](#installation)
-* [Usage](#usage)
-
-  * [Run Complete Evaluation Suite](#run-complete-evaluation-suite)
-  * [Run an Individual Technique](#run-an-individual-technique)
-* [Evaluation Metrics](#evaluation-metrics)
-* [Prompting Techniques](#prompting-techniques)
-* [Dataset Statistics](#dataset-statistics)
-* [Output Files](#output-files)
-* [Configuration Options](#configuration-options)
-* [Troubleshooting](#troubleshooting)
-* [Dependencies](#dependencies)
-* [Pedagogical Background](#pedagogical-background)
-* [Citation](#citation)
-* [License](#license)
-* [Contributing](#contributing)
-* [Contact](#contact)
+* [Dataset Structure](#dataset-structure)
+* [Usage Guide](#usage-guide)
+* [Results & Comparison](#results--comparison)
 
 ---
 
 ## Project Overview
 
-This project evaluates different prompting techniques for classifying **teacher utterances** in math tutoring conversations into pedagogical move categories. The system analyzes how teachers guide students through math problems, identifying their teaching strategies and pedagogical approaches.
+This project evaluates and optimizes different approaches for classifying **teacher utterances** in math tutoring conversations into pedagogical move categories. The system analyzes how teachers guide students through math problems using three distinct methodologies.
 
 ---
 
 ## Teacher Move Categories
 
-| Category    | Definition                                                     | Intents                                                                                           | Example                                           |
-| ----------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| **Generic** | General conversational elements with limited pedagogical value | Greeting/Farewell, General inquiry                                                                | “Hi, how are you doing with the word problem?”    |
-| **Focus**   | Guides the student to specific aspects for direct progress     | Seek Strategy, Guiding Student Focus, Recall Relevant Information                                 | “So what should you do next?”                     |
-| **Probing** | Explores underlying concepts and understanding                 | Asking for Explanation, Seeking Self Correction, Perturbing the Question, Seeking World Knowledge | “Why do you think you need to add these numbers?” |
-| **Telling** | Reveals parts of the solution when the student is stuck        | Revealing Strategy, Revealing Answer                                                              | “You need to add … to … to get your answer.”      |
-
----
-
-## Key Features
-
-* Context‑aware classification using conversation history
-* Multiple evaluation metrics (accuracy + 3 reliability measures)
-* Five prompting techniques (zero‑shot → active prompting)
-* Separate validation pool to prevent data leakage
-* Automated pipeline to run all techniques from a single script
+| Category    | Definition                                                     | Example                                           |
+| ----------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| **Generic** | General conversational elements with limited pedagogical value | "Hi, how are you doing with the word problem?"    |
+| **Focus**   | Guides the student to specific aspects for direct progress     | "So what should you do next?"                     |
+| **Probing** | Explores underlying concepts and understanding                 | "Why do you think you need to add these numbers?" |
+| **Telling** | Reveals parts of the solution when the student is stuck        | "You need to add … to … to get your answer."      |
 
 ---
 
@@ -62,30 +45,107 @@ This project evaluates different prompting techniques for classifying **teacher 
 ```text
 mathdial_evaluation/
 ├── data/
-│   ├── hold_out150.csv              # Main dataset (287 conversations)
-│   └── active_prompting_pool_20.csv # Separate pool (30 conversations)
+│   ├── hold_out150.csv                    # Test dataset (150 conversations)
+│   ├── active_prompting_pool_20.csv       # Active prompting pool (30 conversations)
+│   ├── apo_training_100.csv              # APO optimization set (100 conversations)
+│   └── dspy_300.csv                       # DSPy training set (557 utterances)
+│
 ├── prompting/
-│   ├── zero_shot.py                 # Direct classification
-│   ├── few_shot.py                  # With 12 examples
-│   ├── auto_cot.py                  # Chain-of-thought reasoning
-│   ├── self_consistency.py          # Multiple reasoning paths
-│   └── active_prompt.py             # Uncertainty sampling
+│   ├── zero_shot.py                       # Direct classification
+│   ├── few_shot.py                        # With 12 examples
+│   ├── auto_cot.py                        # Chain-of-thought reasoning
+│   ├── self_consistency.py                # Multiple reasoning paths
+│   └── active_prompt.py                   # Uncertainty sampling
+│
 ├── utils/
-│   ├── data_loader.py               # Data processing utilities
-│   ├── mathdial_rubric.py           # Move definitions & rubric
-│   └── metrics.py                   # Evaluation metrics
+│   ├── data_loader.py                     # Data processing utilities
+│   ├── mathdial_rubric.py                 # Move definitions & rubric
+│   └── metrics.py                         # Evaluation metrics
+│
 ├── evaluation/
 │   ├── evaluate_zero_shot.py
 │   ├── evaluate_few_shot.py
 │   ├── evaluate_auto_cot.py
 │   ├── evaluate_self_consistency.py
 │   └── evaluate_active_prompt.py
-├── results/                         # Output directory
-├── config.py                        # Configuration settings
-├── main.py                          # Main evaluation script
-├── requirements.txt                 # Dependencies
-└── README.md                        # This file
+│
+├── apo_optimization/                       # APO SYSTEM
+│   ├── mathdial_apo_system.py            # Core APO rubric optimizer
+│   ├── run_apo.py                        # Automated APO runner
+│   ├── config.py                         # APO configuration
+│   ├── apo_copies/                       # Generated during runtime
+│   │   ├── prompting/                    # Modified prompting copies
+│   │   └── utils/                        # Modified rubric files
+│   └── results/                          # APO output
+│       ├── optimized_rubrics_eval2.json
+│       ├── optimized_rubrics_eval4.json
+│       └── optimized_rubrics_eval9.json
+│
+├── dspy_implementation/                    # DSPY SYSTEM
+│   ├── dspy_mathdial_classifier.py       # GPT-3.5 base classifier
+│   ├── dspy_mathdial_classifier_gpt5.py  # GPT-5 reasoning model
+│   ├── run_dspy_mathdial_experiments.py  # GPT-3.5 experiments runner
+│   ├── run_dspy_mathdial_gpt5.py        # GPT-5 experiments runner
+│   └── results/                          # DSPy output
+│       ├── dspy_mathdial_results_*.csv
+│       ├── dspy_mathdial_summary.json
+│       ├── mathdial_module_*_learned.json
+│       └── dspy_mathdial_*_chart.png
+│
+├── results/                               # Main output directory
+├── config.py                              # Global configuration
+├── main.py                                # Main baseline evaluation script
+├── requirements.txt                       # Python dependencies
+└── README.md                              # This file
 ```
+
+---
+
+## System Components
+
+### 1. Baseline Evaluation
+
+Traditional prompting techniques for classification using predefined rubrics.
+
+**Key Files:**
+- `prompting/` - Contains 5 prompting techniques
+- `utils/mathdial_rubric.py` - Teacher move definitions
+- `evaluation/` - Individual technique evaluators
+- `main.py` - Run all baseline techniques
+
+### 2. APO Optimization (`apo_optimization/`)
+
+**Automatic Prompt Optimization** to refine rubric definitions while keeping prompts at baseline.
+
+**Key Features:**
+- Generates 5 rubric variations automatically
+- Tests each variation with all 5 prompting techniques
+- Uses 100 samples from `apo_training_100.csv` for optimization
+- Preserves `holdout_150.csv` for final testing
+- Creates modified copies in `apo_copies/` during runtime
+
+**APO Process:**
+1. Generate 5 alternative rubric definitions using GPT
+2. Test each rubric with all prompting techniques
+3. Select best-performing rubric based on accuracy
+4. Output optimized rubrics for 2, 4, and 9 conversation samples
+
+### 3. DSPy Implementation (`dspy_implementation/`)
+
+**Data-driven approach** that learns from examples without predefined rubrics.
+
+**Key Features:**
+- NO predefined rubric required - learns from data
+- Uses Chain-of-Thought reasoning
+- Trains with 100, 200, 300 sample configurations
+- Supports both GPT-3.5 and GPT-5 models
+- Bootstrap few-shot optimization
+
+**DSPy Training:**
+1. Load training examples from `dspy_300.csv`
+2. Learn patterns using BootstrapFewShot optimization
+3. Generate reasoning chains for classification
+4. Test on `holdout_150.csv`
 
 ---
 
@@ -94,248 +154,208 @@ mathdial_evaluation/
 ### Prerequisites
 
 * Python **3.7+**
-* OpenAI API key with GPT‑3.5/GPT‑4 access
-* **8 GB** RAM (minimum recommended)
+* OpenAI API key with GPT-3.5/GPT-4/GPT-5 access
+* **8 GB** RAM minimum
 
 ### Setup
 
 ```bash
-# 1) Clone the repo
-git clone <repository-url>
+# Clone repository
+git clone https://github.com/khatriv1/mathdial_evaluation.git
 cd mathdial_evaluation
 
-# 2) Create and activate a virtual environment
+# Create virtual environment
 python -m venv venv
-# macOS/Linux:
-source venv/bin/activate
-# Windows:
-# venv\Scripts\activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# 3) Install dependencies
+# Install dependencies
 pip install -r requirements.txt
+
+# For DSPy implementation
+pip install dspy-ai
+
+# Configure API key
+# Edit config.py with your OpenAI API key
 ```
 
-Configure your API key in `config.py`:
+---
+
+## Dataset Structure
+
+```
+data/
+├── apo_training_100.csv           # APO optimization set (100 conversations)
+├── hold_out150.csv                # Test set (150 conversations)
+├── active_prompting_pool_20.csv   # Active prompting examples
+└── dspy_300.csv                   # DSPy training set (557 utterances)
+```
+
+**Data Split:**
+- APO uses `apo_training_100.csv` for optimization
+- DSPy uses `dspy_300.csv` for training
+- Both test on `hold_out150.csv`
+- Active prompting uses separate `active_prompting_pool_20.csv`
+
+---
+
+## Usage Guide
+
+### Running Baseline Evaluation
+
+```bash
+# Run all baseline techniques
+python main.py
+
+# Run individual technique
+python evaluation/evaluate_zero_shot.py
+```
+
+### Running APO Optimization
+
+```bash
+cd apo_optimization
+
+# Run automated APO (2-3 hours)
+python run_apo.py
+# Select option 1 for full optimization
+
+# Check system requirements
+python run_apo.py
+# Select option 3
+```
+
+**APO Output:**
+- `results/optimized_rubrics_eval2.json` - 2 conversations
+- `results/optimized_rubrics_eval4.json` - 4 conversations  
+- `results/optimized_rubrics_eval9.json` - 9 conversations
+
+### Running DSPy Experiments
+
+```bash
+cd dspy_implementation
+
+# GPT-3.5 experiments (standard)
+python run_dspy_mathdial_experiments.py
+
+# GPT-3.5 with fresh API calls (no cache)
+python run_dspy_mathdial_experiments.py --clear-cache
+
+# GPT-5 experiments (reasoning model)
+python run_dspy_mathdial_gpt5.py
+
+# GPT-5 with fresh API calls
+python run_dspy_mathdial_gpt5.py --clear-cache
+```
+
+**DSPy Output:**
+- `results/dspy_mathdial_results_*.csv` - Individual results
+- `results/dspy_mathdial_summary.json` - Performance summary
+- `results/mathdial_module_*_learned.json` - Learned patterns
+- `results/dspy_mathdial_*_comparison_chart.png` - Visualizations
+
+---
+
+## Results & Comparison
+
+### Performance Overview
+
+| Approach | Best Accuracy | Key Advantage | Time Required |
+|----------|--------------|---------------|---------------|
+| **Baseline** | ~45-55% | Simple, interpretable | Minutes |
+| **APO Optimized** | ~55-65% | Improved rubric definitions | 2-3 hours |
+| **DSPy GPT-3.5** | ~60-70% | Learns from data | 30-60 minutes |
+| **DSPy GPT-5** | ~70-80% | Advanced reasoning | 1-2 hours |
+
+### Key Insights
+
+**APO Optimization:**
+- Generates context-aware rubric variations
+- Best for improving existing classification systems
+- Maintains interpretability while boosting accuracy
+
+**DSPy Implementation:**
+- No predefined rubrics needed
+- Learns directly from conversation patterns
+- Scales well with more training data
+- GPT-5 shows significant improvement over GPT-3.5
+
+### Evaluation Metrics
+
+All approaches evaluated using:
+- **Accuracy**: Exact match percentage
+- **Cohen's κ**: Agreement beyond chance
+- **Krippendorff's α**: Reliability measure
+- **ICC**: Intraclass correlation
+- **Per-move accuracy**: Performance by category
+
+---
+
+## Advanced Features
+
+### APO Rubric Generation
+
+The APO system generates variations like:
 
 ```python
-# config.py
-OPENAI_API_KEY = "your-api-key-here"
+# Baseline
+"focus": "Seeking strategy, guiding focus, recalling information"
+
+# Optimized variant
+"focus": "Questions or statements that orient students toward 
+         the next step or relevant problem information"
 ```
 
-Verify data files exist in `data/`:
+### DSPy Learning Examples
 
-* `hold_out150.csv` (287 conversations)
-* `active_prompting_pool_20.csv` (30 conversations)
+DSPy learns patterns such as:
 
-> **Note:** Counts above reflect the current dumps; update if your local copies differ.
+```python
+# Input
+teacher_utterance: "Can you explain your thinking?"
+context: "Student just provided an answer"
 
----
-
-## Usage
-
-### Run Complete Evaluation Suite
-
-```bash
-python main.py
-```
-
-Interactive prompts:
-
-* **How many conversations to evaluate?** (press Enter for all 287)
-* **Select techniques**
-  1: Zero-shot
-  2: Few-shot
-  3: Auto-CoT
-  4: Self-Consistency
-  5: Active Prompting
-  6: All techniques
-
-### Run an Individual Technique
-
-```bash
-# Zero-shot
-python evaluation/evaluate_zero_shot.py
-
-# Few-shot
-python evaluation/evaluate_few_shot.py
-
-# Auto-CoT
-python evaluation/evaluate_auto_cot.py
-
-# Self-consistency
-python evaluation/evaluate_self_consistency.py
-
-# Active prompting
-python evaluation/evaluate_active_prompt.py
-```
-
----
-
-## Evaluation Metrics
-
-| Metric               | Range       | Description                      | Interpretation                                        |
-| -------------------- | ----------- | -------------------------------- | ----------------------------------------------------- |
-| **Accuracy**         | 0–100%      | Exact match % for move sequences | Higher is better                                      |
-| **Cohen’s κ**        | −100 to 100 | Agreement beyond chance (×100)   | >80 Almost perfect; 60–80 Substantial; 40–60 Moderate |
-| **Krippendorff’s α** | 0–100       | Reliability measure (×100)       | >80 Good; 67–80 Tentative; <67 Poor                   |
-| **ICC**              | −100 to 100 | Intraclass correlation (×100)    | >75 Excellent; 60–75 Good; 40–59 Fair                 |
-
-> All metrics except **Accuracy** are multiplied by 100 for clearer visualization.
-
----
-
-## Prompting Techniques
-
-1. **Zero-shot** — Direct classification without examples
-
-   ```text
-   "Classify this teacher utterance into: generic, focus, probing, or telling."
-   ```
-
-2. **Few-shot** — Uses 12 curated examples from MathDial Table 2
-
-   ```text
-   "Here are examples: [12 examples] ... Now classify this utterance."
-   ```
-
-3. **Auto-CoT** — Zero-shot with chain-of-thought reasoning
-
-   ```text
-   "Let's think step by step... What is the pedagogical intent?"
-   ```
-
-4. **Self-Consistency** — Multiple reasoning paths with majority voting (n=5)
-
-   ```text
-   "Generate 5 independent classifications and take the majority vote."
-   ```
-
-5. **Active Prompting** — Learns from uncertain/wrong examples via uncertainty sampling
-
-   ```text
-   "Learn from these challenging cases: [8 examples] ... Now classify."
-   ```
-
----
-
-## Dataset Statistics
-
-**Main Dataset (`hold_out150.csv`)**
-
-* Total Conversations: **287**
-* Total Rows: **287**
-* Columns: **13**
-* Avg. Teacher Moves per Conversation: **8–12**
-
-**Teacher Move Distribution**
-
-* **Focus**: 37% (Most common — guiding strategies)
-* **Probing**: 24% (Exploring understanding)
-* **Generic**: 21% (Conversational elements)
-* **Telling**: 18% (Direct instruction)
-
-**Active Prompting Pool (`active_prompting_pool_20.csv`)**
-
-* Total Conversations: **30**
-* Separate validation set for uncertainty sampling
-* No overlap with main test set
-
----
-
-## Output Files
-
-Each run creates a timestamped directory under `results/`:
-
-```text
-results/mathdial_evaluation_YYYYMMDD_HHMMSS/
-├── mathdial_all_techniques_comparison.csv     # Metrics summary
-├── mathdial_all_techniques_comparison.png     # Visual comparison
-├── mathdial_all_detailed_results.csv          # All predictions
-├── mathdial_comprehensive_report.txt          # Detailed analysis
-└── [technique_name]/
-    ├── detailed_results.csv                   # Per-conversation results
-    └── metrics_summary.csv                    # Technique metrics
+# DSPy reasoning
+"This is a probing move because the teacher is asking 
+ the student to justify their reasoning"
 ```
 
 ---
 
 ## Configuration Options
 
-**Model Selection**
+### Model Selection
 
 ```python
 # config.py
-MODEL_ID = "gpt-3.5-turbo-0125"  # Default
-# MODEL_ID = "gpt-4"             # Uncomment for GPT-4
+MODEL_NAME = "gpt-3.5-turbo"  # Baseline
+MODEL_NAME = "gpt-4"           # Better accuracy  
+MODEL_NAME = "gpt-5"           # Best reasoning (DSPy)
 ```
 
-**Rate Limiting**
+### Sample Sizes
 
-```python
-SLEEP_TIME = 1  # Seconds between API calls
-```
-
-**Sample Size**
-
-```bash
-# Evaluate a subset (e.g., first 50 conversations)
-python main.py
-# When prompted, enter: 50
-```
-
-Other options—output directories, random seeds, etc.—are configurable in `config.py`.
+- APO: 2, 4, 9 conversations (~10, 20, 50 utterances)
+- DSPy: 100, 200, 300 training examples
 
 ---
 
 ## Troubleshooting
 
-| Issue               | Solution                                                                       |
-| ------------------- | ------------------------------------------------------------------------------ |
-| `FileNotFoundError` | Run from the repository root (`mathdial_evaluation/`) and check `data/` files. |
-| API key errors      | Verify `OPENAI_API_KEY` in `config.py`.                                        |
-| Import errors       | Re-install dependencies: `pip install -r requirements.txt`.                    |
-| Rate limit errors   | Increase `SLEEP_TIME` in `config.py`.                                          |
-| Memory issues       | Reduce the number of conversations evaluated.                                  |
-
----
-
-## Dependencies
-
-Core requirements (see `requirements.txt`):
-
-* `numpy >= 1.21.0` — Numerical computations
-* `pandas >= 1.3.0` — Data manipulation
-* `matplotlib >= 3.5.0` — Visualizations
-* `scikit-learn >= 1.0.0` — Metrics calculation
-* `scipy >= 1.7.0` — Statistical functions
-* `krippendorff >= 0.5.0` — Krippendorff’s alpha
-* `openai >= 1.0.0` — GPT API access
-
----
-
-## Pedagogical Background
-
-* **Scaffolding vs. Direct Instruction**
-
-  * Scaffolding moves (**Focus + Probing**): \~61% of moves
-  * Direct instruction (**Telling**): \~18% of moves
-  * Conversational (**Generic**): \~21% of moves
-* **Educational Impact**
-
-  * Focus and Probing promote deeper learning
-  * Telling provides necessary support when students are stuck
-  * A balanced mix often yields the best outcomes
+| Issue | Solution |
+|-------|----------|
+| API rate limits | Increase `SLEEP_TIME` in config.py |
+| DSPy cache issues | Run with `--clear-cache` flag |
+| Memory errors | Reduce sample size |
+| Missing data files | Check `data/` folder contents |
 
 ---
 
 ## Citation
 
-If you use this code in your research, please cite:
-
 ```bibtex
 @article{macina2023mathdial,
-  title={MathDial: A Dialogue Tutoring Dataset with Rich Pedagogical Properties Grounded in Math Reasoning Problems},
-  author={Macina, Jakub and Daheim, Nico and Chowdhury, Sankalan Pal and Sinha, Tanmay and Kapur, Manu and Gurevych, Iryna and Sachan, Mrinmaya},
+  title={MathDial: A Dialogue Tutoring Dataset with Rich Pedagogical Properties},
+  author={Macina, Jakub and others},
   journal={arXiv preprint arXiv:2305.14536},
   year={2023}
 }
@@ -343,22 +363,9 @@ If you use this code in your research, please cite:
 
 ---
 
-## License
-
-This project is for **research and educational** purposes. The MathDial dataset follows its original licensing terms.
-
----
-
-## Contributing
-
-Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch
-3. Open a pull request with a clear description
-
----
-
 ## Contact
 
-For questions or issues, please open a GitHub issue or contact the maintainers.
+For questions about:
+- **APO implementation**: See `apo_optimization/README_APO.md`
+- **DSPy implementation**: See `dspy_implementation/README_DSPY.md`
+- **General issues**: Open a GitHub issue

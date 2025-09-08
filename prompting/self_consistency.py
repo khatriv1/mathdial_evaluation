@@ -122,8 +122,8 @@ Classification:"""
                 {"role": "system", "content": "You are an expert at classifying individual teacher utterances. Learn from examples, think step by step about ONLY the specified utterance, and provide the category."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=temperature,
-            max_tokens=400  # Increased for reasoning
+            #temperature=temperature,
+            #max_tokens=400  # Increased for reasoning
         )
         
         result = response.choices[0].message.content.strip()

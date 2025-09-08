@@ -14,10 +14,16 @@ class MathDialRubric:
         
         # Teacher move definitions based on the categories
         self.move_definitions = {
-            'focus': 'The teachers intention includes seeking a strategy, guiding student focus, and recalling relevant information',
-            'probing': 'The teachers intention includes Asking for Explanation, Seeking Self Correction, Perturbing the Question, and Seeking World Knowledge',
-            'telling': 'The teachers intention includes Revealing Strategy and Revealing Answer',
-            'generic': 'The teachers intention includes Greeting/Fairwell and General inquiry'
+            # 'focus': 'The teachers intention includes seeking a strategy, guiding student focus, and recalling relevant information',
+            # 'probing': 'The teachers intention includes Asking for Explanation, Seeking Self Correction, Perturbing the Question, and Seeking World Knowledge',
+            # 'telling': 'The teachers intention includes Revealing Strategy and Revealing Answer',
+            # 'generic': 'The teachers intention includes Greeting/Fairwell and General inquiry'
+            "generic": "Utterances for social interaction and general classroom discourse without mathematical content",
+            "focus": "Scaffolding utterances that guide student thinking toward productive problem-solving strategies",
+            "probing": "Utterances prompting students to articulate their reasoning or evaluate their solutions",
+            "telling": "Direct communication of mathematical answers or solution methods"
+       
+           
         }
         
         # Detailed intents for each move category - FROM THE TABLE
